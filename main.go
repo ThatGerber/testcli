@@ -15,6 +15,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path"
 	"regexp"
 	"strings"
 )
@@ -64,6 +65,18 @@ func (c *Cmd) SetStdin(stdin io.Reader) {
 	c.stdin = stdin
 }
 
+func (c *Cmd) findMainGoDir() string {
+	rootPath, _ := os.Getwd()
+	newPath := rootPath
+	for found := false; !found; newPath = path.Dir(newPath) {
+		_, err := os.Stat(path.Join(newPath, "main.go"))
+		if err == nil {
+			return newPath
+		}
+	}
+	return ""
+}
+
 // Run runs the command.
 func (c *Cmd) Run() {
 	if c.stdin != nil {
@@ -74,6 +87,10 @@ func (c *Cmd) Run() {
 		c.cmd.Env = c.env
 	} else {
 		c.cmd.Env = os.Environ()
+	}
+
+	if mainDir := c.findMainGoDir(); mainDir != "" {
+		c.cmd.Dir = mainDir
 	}
 
 	var outBuf bytes.Buffer
@@ -100,8 +117,7 @@ func Run(name string, arg ...string) {
 // GoRun runs main.go with the arguements and arguments. After this, package-level
 // functions will return the data about the last command run.
 func GoRun(arg ...string) {
-	runArgs := make([]string, len(arg)+2)
-	runArgs = append(runArgs, "run", "main.go")
+	runArgs := []string{"run", "main.go"}
 	runArgs = append(runArgs, arg...)
 
 	pkgCmd = Command("go", runArgs...)
@@ -119,15 +135,26 @@ func Error() error {
 	return pkgCmd.Error()
 }
 
-// ExitCode checks if the exit code matches the result from the command.
-func (c *Cmd) ExitCode(code int) bool {
+// ExitCode returns the process exit code.
+func (c *Cmd) ExitCode() int {
+	c.validate()
+	return c.cmd.ProcessState.ExitCode()
+}
+
+// ExitCode returns the process exit code.
+func ExitCode() int {
+	return pkgCmd.ExitCode()
+}
+
+// ExitCodeIs checks if the exit code matches the result from the command.
+func (c *Cmd) ExitCodeIs(code int) bool {
 	c.validate()
 	return c.cmd.ProcessState.ExitCode() == code
 }
 
-// ExitCode checks if the exit code matches the result from the command.
-func ExitCode(code int) bool {
-	return pkgCmd.ExitCode(code)
+// ExitCodeIs checks if the exit code matches the result from the command.
+func ExitCodeIs(code int) bool {
+	return pkgCmd.ExitCodeIs(code)
 }
 
 // Stdout stream for the command
