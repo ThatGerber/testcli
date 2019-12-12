@@ -1,4 +1,4 @@
-// CLI testing package for the Go language.
+// Package testcli - CLI testing package for the Go language.
 //
 // Developing a command line application? Wanna be able to test your app from the
 // outside? If the answer is Yes to at least one of the questions, keep reading.
@@ -15,6 +15,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path"
 	"regexp"
 	"strings"
 )
@@ -31,10 +32,13 @@ type Cmd struct {
 	stdin     io.Reader
 }
 
-// ErrUninitializedCmd is returned when members are accessed before a run, that
-// can only be used after a command has been run.
-var ErrUninitializedCmd = errors.New("You need to run this command first")
-var pkgCmd = &Cmd{}
+var (
+	// ErrUninitializedCmd is returned when members are accessed before a run, that
+	// can only be used after a command has been run.
+	ErrUninitializedCmd = errors.New("You need to run this command first")
+
+	pkgCmd = &Cmd{}
+)
 
 // Command constructs a *Cmd. It is passed the command name and arguments.
 func Command(name string, arg ...string) *Cmd {
@@ -61,6 +65,18 @@ func (c *Cmd) SetStdin(stdin io.Reader) {
 	c.stdin = stdin
 }
 
+func (c *Cmd) findMainGoDir() string {
+	rootPath, _ := os.Getwd()
+	newPath := rootPath
+	for found := false; !found; newPath = path.Dir(newPath) {
+		_, err := os.Stat(path.Join(newPath, "main.go"))
+		if err == nil {
+			return newPath
+		}
+	}
+	return ""
+}
+
 // Run runs the command.
 func (c *Cmd) Run() {
 	if c.stdin != nil {
@@ -71,6 +87,10 @@ func (c *Cmd) Run() {
 		c.cmd.Env = c.env
 	} else {
 		c.cmd.Env = os.Environ()
+	}
+
+	if mainDir := c.findMainGoDir(); mainDir != "" {
+		c.cmd.Dir = mainDir
 	}
 
 	var outBuf bytes.Buffer
@@ -94,6 +114,16 @@ func Run(name string, arg ...string) {
 	pkgCmd.Run()
 }
 
+// GoRun runs main.go with the arguements and arguments. After this, package-level
+// functions will return the data about the last command run.
+func GoRun(arg ...string) {
+	runArgs := []string{"run", "main.go"}
+	runArgs = append(runArgs, arg...)
+
+	pkgCmd = Command("go", runArgs...)
+	pkgCmd.Run()
+}
+
 // Error is the command's error, if any.
 func (c *Cmd) Error() error {
 	c.validate()
@@ -103,6 +133,28 @@ func (c *Cmd) Error() error {
 // Error is the command's error, if any.
 func Error() error {
 	return pkgCmd.Error()
+}
+
+// ExitCode returns the process exit code.
+func (c *Cmd) ExitCode() int {
+	c.validate()
+	return c.cmd.ProcessState.ExitCode()
+}
+
+// ExitCode returns the process exit code.
+func ExitCode() int {
+	return pkgCmd.ExitCode()
+}
+
+// ExitCodeIs checks if the exit code matches the result from the command.
+func (c *Cmd) ExitCodeIs(code int) bool {
+	c.validate()
+	return c.cmd.ProcessState.ExitCode() == code
+}
+
+// ExitCodeIs checks if the exit code matches the result from the command.
+func ExitCodeIs(code int) bool {
+	return pkgCmd.ExitCodeIs(code)
 }
 
 // Stdout stream for the command
