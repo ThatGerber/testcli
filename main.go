@@ -119,6 +119,17 @@ func Error() error {
 	return pkgCmd.Error()
 }
 
+// ExitCode checks if the exit code matches the result from the command.
+func (c *Cmd) ExitCode(code int) bool {
+	c.validate()
+	return c.cmd.ProcessState.ExitCode() == code
+}
+
+// ExitCode checks if the exit code matches the result from the command.
+func ExitCode(code int) bool {
+	return pkgCmd.ExitCode(code)
+}
+
 // Stdout stream for the command
 func (c *Cmd) Stdout() string {
 	c.validate()
