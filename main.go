@@ -1,4 +1,4 @@
-// CLI testing package for the Go language.
+// Package testcli - CLI testing package for the Go language.
 //
 // Developing a command line application? Wanna be able to test your app from the
 // outside? If the answer is Yes to at least one of the questions, keep reading.
@@ -31,10 +31,13 @@ type Cmd struct {
 	stdin     io.Reader
 }
 
-// ErrUninitializedCmd is returned when members are accessed before a run, that
-// can only be used after a command has been run.
-var ErrUninitializedCmd = errors.New("You need to run this command first")
-var pkgCmd = &Cmd{}
+var (
+	// ErrUninitializedCmd is returned when members are accessed before a run, that
+	// can only be used after a command has been run.
+	ErrUninitializedCmd = errors.New("You need to run this command first")
+
+	pkgCmd = &Cmd{}
+)
 
 // Command constructs a *Cmd. It is passed the command name and arguments.
 func Command(name string, arg ...string) *Cmd {
@@ -91,6 +94,17 @@ func (c *Cmd) Run() {
 // functions will return the data about the last command run.
 func Run(name string, arg ...string) {
 	pkgCmd = Command(name, arg...)
+	pkgCmd.Run()
+}
+
+// GoRun runs main.go with the arguements and arguments. After this, package-level
+// functions will return the data about the last command run.
+func GoRun(arg ...string) {
+	runArgs := make([]string, len(arg)+2)
+	runArgs = append(runArgs, "run", "main.go")
+	runArgs = append(runArgs, arg...)
+
+	pkgCmd = Command("go", runArgs...)
 	pkgCmd.Run()
 }
 
